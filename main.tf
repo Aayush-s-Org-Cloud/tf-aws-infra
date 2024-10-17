@@ -126,12 +126,13 @@ resource "aws_security_group" "app_security_group" {
 
 # EC2 Instance for the Application
 resource "aws_instance" "app_instance" {
-  ami                    = var.custom_ami_id
-  instance_type          = "t2.medium"
-  subnet_id              = aws_subnet.public_subnets[0].id
-  key_name               = var.key_pair_name
-  vpc_security_group_ids = [aws_security_group.app_security_group.id]
-
+  ami                         = var.custom_ami_id
+  instance_type               = "t2.medium"
+  subnet_id                   = aws_subnet.public_subnets[0].id
+  key_name                    = var.key_pair_name
+  vpc_security_group_ids      = [aws_security_group.app_security_group.id]
+  associate_public_ip_address = true
+  disable_api_termination     = false
 
   monitoring = true
 
