@@ -10,3 +10,5 @@
         terraform destroy -var-file="envs/____.tfvars"
 
 4. Check on the VPC on AWS console vps will be added/destroyed.
+
+5. With AMI created by github actions terraform commands will create the EC2 instance.
