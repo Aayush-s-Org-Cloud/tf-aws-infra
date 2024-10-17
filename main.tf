@@ -126,21 +126,24 @@ resource "aws_security_group" "app_security_group" {
 
 # EC2 Instance for the Application
 resource "aws_instance" "app_instance" {
-  ami           = var.custom_ami_id
-  instance_type = "t2.medium"
-  subnet_id     = aws_subnet.public_subnets[0].id
-  key_name      = var.key_pair_name
-
+  ami                    = var.custom_ami_id
+  instance_type          = "t2.medium"
+  subnet_id              = aws_subnet.public_subnets[0].id
+  key_name               = var.key_pair_name
   vpc_security_group_ids = [aws_security_group.app_security_group.id]
+
+
+  monitoring = true
 
   # Root Block Device
   root_block_device {
     volume_size           = 25
     volume_type           = "gp2"
-    delete_on_termination = true
+    delete_on_termination = false
   }
 
   tags = {
     Name = "app-instance"
   }
+
 }
