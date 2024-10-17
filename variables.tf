@@ -36,7 +36,6 @@ variable "custom_ami_id" {
 variable "application_port" {
   description = "Port on which the application runs"
   type        = number
-  default     = 8080
 }
 
 variable "key_pair_name" {
