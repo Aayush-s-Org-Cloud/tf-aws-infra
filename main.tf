@@ -131,7 +131,8 @@ resource "aws_instance" "app_instance" {
   subnet_id              = aws_subnet.public_subnets[0].id
   key_name               = var.key_pair_name
   vpc_security_group_ids = [aws_security_group.app_security_group.id]
-
+  associate_public_ip_address = true
+  disable_api_termination = false 
 
   monitoring = true
 
