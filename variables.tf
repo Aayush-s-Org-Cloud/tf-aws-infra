@@ -42,3 +42,29 @@ variable "key_pair_name" {
   description = "SSH Key Pair name for EC2 access"
   type        = string
 }
+
+# Variables for database configuration
+variable "db_port" {
+  description = "Database port (3306 for MySQL/MariaDB, 5432 for PostgreSQL)"
+  type        = number
+  default     = 3306  # MySQL default, adjust for PostgreSQL
+}
+
+variable "db_password" {
+  description = "Master password for the RDS instance"
+  type        = string
+}
+
+variable "db_user" {
+  description = "The username for the RDS database"
+  type        = string
+}
+
+variable "db_dialect" {
+  description = "The database dialect (e.g., mysql, postgres)"
+  type        = string
+}
+variable "db_name" {
+  description = "The name of the database"
+  type        = string
+}
