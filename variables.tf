@@ -47,7 +47,7 @@ variable "key_pair_name" {
 variable "db_port" {
   description = "Database port (3306 for MySQL/MariaDB, 5432 for PostgreSQL)"
   type        = number
-  default     = 3306  # MySQL default, adjust for PostgreSQL
+  default     = 3306 # MySQL default, adjust for PostgreSQL
 }
 
 variable "db_password" {

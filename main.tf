@@ -131,11 +131,11 @@ resource "aws_security_group" "db_security_group" {
 
   # Ingress rule to allow traffic from the EC2 app security group
   ingress {
-    from_port   = var.db_port   
-    to_port     = var.db_port
-    protocol    = "tcp"
-    security_groups = [aws_security_group.app_security_group.id]  # Application security group
-    description = "Allow database traffic from app security group"
+    from_port       = var.db_port
+    to_port         = var.db_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_security_group.id] # Application security group
+    description     = "Allow database traffic from app security group"
   }
 
   # Egress rule to allow all outbound traffic from the RDS
@@ -155,13 +155,13 @@ resource "aws_security_group" "db_security_group" {
 # RDS Parameter Group
 resource "aws_db_parameter_group" "db_param_group" {
   name        = "csye6225-db-param-group"
-  family      = "mysql8.0"   
+  family      = "mysql8.0"
   description = "Custom DB parameter group for CSYE6225"
 
   # You can add custom parameters here, for example:
   parameter {
-    name  = "max_connections"
-    value = "200"
+    name         = "max_connections"
+    value        = "200"
     apply_method = "immediate"
   }
 }
@@ -169,21 +169,21 @@ resource "aws_db_parameter_group" "db_param_group" {
 
 # RDS Instance
 resource "aws_db_instance" "csye6225_db" {
-  identifier              = "csye6225-db"
-  engine                  = "mysql"  
-  instance_class          = "db.t3.micro"   
-  allocated_storage       = 20   
-  username                = var.db_user
-  password                = var.db_password  
-  db_subnet_group_name    = aws_db_subnet_group.csye6225_subnet_group.name
-  vpc_security_group_ids  = [aws_security_group.db_security_group.id]
-  apply_immediately       = true
-  publicly_accessible     = false  # RDS is not publicly accessible
-  parameter_group_name    = aws_db_parameter_group.db_param_group.name
-  multi_az                = false   
-  engine_version          = "8.0"   
-  db_name                 = var.db_name
-  skip_final_snapshot     = true  
+  identifier             = "csye6225-db"
+  engine                 = "mysql"
+  instance_class         = "db.t3.micro"
+  allocated_storage      = 20
+  username               = var.db_user
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.csye6225_subnet_group.name
+  vpc_security_group_ids = [aws_security_group.db_security_group.id]
+  apply_immediately      = true
+  publicly_accessible    = false # RDS is not publicly accessible
+  parameter_group_name   = aws_db_parameter_group.db_param_group.name
+  multi_az               = false
+  engine_version         = "8.0"
+  db_name                = var.db_name
+  skip_final_snapshot    = true
 
   tags = {
     Name = "csye6225-db"
@@ -193,7 +193,7 @@ resource "aws_db_instance" "csye6225_db" {
 # Subnet group for RDS to use private subnets
 resource "aws_db_subnet_group" "csye6225_subnet_group" {
   name       = "csye6225-subnet-group"
-  subnet_ids = aws_subnet.private_subnets[*].id  
+  subnet_ids = aws_subnet.private_subnets[*].id
 
   tags = {
     Name = "csye6225-subnet-group"
