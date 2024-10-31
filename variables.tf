@@ -68,3 +68,14 @@ variable "db_name" {
   description = "The name of the database"
   type        = string
 }
+variable "route53_zone_id" {
+  description = "The Route 53 Hosted Zone ID for your domain."
+  type        = string
+}
+
+variable "domain_name" {
+  description = "The root domain name (e.g., example.com)."
+  type        = string
+}
+
+  
