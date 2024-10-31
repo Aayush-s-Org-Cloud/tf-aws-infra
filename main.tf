@@ -199,8 +199,6 @@ resource "aws_db_subnet_group" "csye6225_subnet_group" {
     Name = "csye6225-subnet-group"
   }
 }
-
-
 # EC2 Instance with User Data to pass all database configurations
 resource "aws_instance" "app_instance_ud" {
   ami                         = var.custom_ami_id
@@ -209,38 +207,69 @@ resource "aws_instance" "app_instance_ud" {
   key_name                    = var.key_pair_name
   vpc_security_group_ids      = [aws_security_group.app_security_group.id]
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
 
   # User Data script to inject all necessary environment variables into .env
   user_data = <<-EOF
     #!/bin/bash
-    echo "Creating .env file with database configurations"
-    sudo apt-get update -y
-    sudo apt-get install -y mysql-client-core-8.0
+    echo "Starting user data script..."
+
+    # Update package list with retries
+    MAX_ATTEMPTS=5
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+      echo "Attempt $attempt: Updating package list..."
+      sudo apt-get update -y && break || sleep 10
+    done
+
+    # Install MySQL client with retries
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+      echo "Attempt $attempt: Installing MySQL client..."
+      sudo apt-get install -y mysql-client-core-8.0 && break || sleep 10
+    done
+
+    # Verify MySQL client installation
+    if ! which mysql; then
+      echo "MySQL client installation failed. Exiting script."
+      exit 1
+    fi
+
+    # Create the .env file with database configurations
     mkdir -p /opt/nodeapp
     cd /opt/nodeapp
-    touch /opt/nodeapp/.env
+    touch .env
 
-    # Adding environment variable 
-    echo "DATA_HOST=${aws_db_instance.csye6225_db.address}" >> /opt/nodeapp/.env
-    echo "DATA_PORT=${var.db_port}" >> /opt/nodeapp/.env
-    echo "DATA_USER=${var.db_user}" >> /opt/nodeapp/.env
-    echo "DATA_PASSWORD=${var.db_password}" >> /opt/nodeapp/.env
-    echo "DATA_DATABASE=${var.db_name}" >> /opt/nodeapp/.env
-    echo "DATA_DIALECT=${var.db_dialect}" >> /opt/nodeapp/.env   
+    # Adding environment variables
+    echo "DATA_HOST=${aws_db_instance.csye6225_db.address}" >> .env
+    echo "DATA_PORT=${var.db_port}" >> .env
+    echo "DATA_USER=${var.db_user}" >> .env
+    echo "DATA_PASSWORD=${var.db_password}" >> .env
+    echo "DATA_DATABASE=${var.db_name}" >> .env
+    echo "DATA_DIALECT=${var.db_dialect}" >> .env   
+    echo "PORT=${var.application_port}" >> .env
+    echo "S3_BUCKET_NAME=${aws_s3_bucket.private_bucket.bucket}" >> .env
 
-    # Add environment variable for the application port
-    echo "PORT=${var.application_port}" >> /opt/nodeapp/.env
- 
-    cat /opt/nodeapp/.env
+    # Display the .env content (optional for debugging)
+    cat .env
 
+    # Install CloudWatch Agent if not already present
+    if ! which amazon-cloudwatch-agent; then
+      echo "Installing CloudWatch Agent..."
+      curl -s https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o amazon-cloudwatch-agent.deb
+      sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+    fi
+
+     
+
+    # Start CloudWatch Agent
+    sudo systemctl restart amazon-cloudwatch-agent
+
+    # Start the application
     systemctl start nodeapp
+
+    echo "User data script completed."
   EOF
 
   tags = {
     Name = "user-app-instance-user_data"
   }
 }
-
-
-
- 
