@@ -36,7 +36,7 @@ resource "aws_iam_policy" "route53_access_policy" {
       {
         Effect = "Allow",
         Action = [
-           "route53:GetHostedZone",
+          "route53:GetHostedZone",
           "route53:ListHostedZones",
           "route53:ListResourceRecordSets",
           "route53:ChangeResourceRecordSets",
@@ -52,7 +52,7 @@ resource "aws_iam_policy" "route53_access_policy" {
           "route53:GetHealthCheck",
           "route53:GetHostedZoneLimit",
           "route53:ListQueryLoggingConfigs",
-           "route53domains:CheckDomainAvailability",
+          "route53domains:CheckDomainAvailability",
           "route53domains:RegisterDomain",
           "route53domains:DeleteDomain",
           "route53domains:GetDomainDetail",
@@ -60,7 +60,7 @@ resource "aws_iam_policy" "route53_access_policy" {
           "route53domains:ListTagsForDomain",
           "route53domains:UpdateDomainContact",
           "route53domains:ViewBilling"
-          
+
         ],
         Resource = "*"
       }
