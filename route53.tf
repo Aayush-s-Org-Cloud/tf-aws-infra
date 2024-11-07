@@ -1,12 +1,12 @@
-# Route 53 A record for EC2 instance using aws_profile as the environment prefix
-resource "aws_route53_record" "app_a_record" {
-  zone_id = var.route53_zone_id # Hosted Zone ID from variables.tf
+# Route53 A Record Pointing to the Load Balancer
+resource "aws_route53_record" "app_alias_record" {
+  zone_id = var.route53_zone_id
   name    = var.domain_name
   type    = "A"
-  ttl     = 300
-  records = [aws_instance.app_instance_ud.public_ip] # Points to the EC2 instance's public IP
 
-  depends_on = [aws_instance.app_instance_ud] # Ensures EC2 is created before the record
-
-
+  alias {
+    name                   = aws_lb.app_alb.dns_name
+    zone_id                = aws_lb.app_alb.zone_id
+    evaluate_target_health = true
+  }
 }

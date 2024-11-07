@@ -77,5 +77,6 @@ variable "domain_name" {
   description = "The root domain name (e.g., example.com)."
   type        = string
 }
+ 
 
   

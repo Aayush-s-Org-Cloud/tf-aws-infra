@@ -72,43 +72,30 @@ resource "aws_route_table_association" "private_subnets" {
   subnet_id      = aws_subnet.private_subnets[count.index].id
   route_table_id = aws_route_table.private_route_table.id
 }
-
+# security_groups.tf  
 # Security Group for the Application
 resource "aws_security_group" "app_security_group" {
   vpc_id = aws_vpc.my_vpc.id
   name   = "app-sg"
 
   # Ingress Rules
+
+  # Allow SSH access from trusted CIDR
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow SSH access from anywhere"
+    description = "Allow SSH access from trusted IPs"
   }
 
+  # Allow application traffic from Load Balancer Security Group
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow HTTP traffic from anywhere"
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow HTTPS traffic from anywhere"
-  }
-
-  ingress {
-    from_port   = var.application_port
-    to_port     = var.application_port
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow application traffic"
+    from_port       = var.application_port
+    to_port         = var.application_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lb_security_group.id]
+    description     = "Allow application traffic from Load Balancer"
   }
 
   # Egress Rule to Allow All Outbound Traffic
@@ -123,7 +110,6 @@ resource "aws_security_group" "app_security_group" {
     Name = "app-security-group"
   }
 }
-
 # Security Group for RDS
 resource "aws_security_group" "db_security_group" {
   vpc_id = aws_vpc.my_vpc.id
@@ -199,18 +185,114 @@ resource "aws_db_subnet_group" "csye6225_subnet_group" {
     Name = "csye6225-subnet-group"
   }
 }
-# EC2 Instance with User Data to pass all database configurations
-resource "aws_instance" "app_instance_ud" {
-  ami                         = var.custom_ami_id
-  instance_type               = "t2.medium"
-  subnet_id                   = aws_subnet.public_subnets[0].id
-  key_name                    = var.key_pair_name
-  vpc_security_group_ids      = [aws_security_group.app_security_group.id]
-  associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
+# Load Balancer Security Group
+resource "aws_security_group" "lb_security_group" {
+  name        = "lb-security-group"
+  description = "Security group for the Load Balancer"
+  vpc_id      = aws_vpc.my_vpc.id
 
-  # User Data script to inject all necessary environment variables into .env
-  user_data = <<-EOF
+  # Ingress Rules
+  ingress {
+    description      = "Allow HTTP traffic from anywhere"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    
+  }
+  # Ingress Rule for HTTPS
+  ingress {
+    description      = "Allow HTTPS traffic from anywhere"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    
+  }
+
+
+
+  # Egress Rules - Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "lb-security-group"
+  }
+}
+# alb.tf
+
+# Application Load Balancer
+resource "aws_lb" "app_alb" {
+  name               = "app-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_security_group.id]
+  subnets            = aws_subnet.public_subnets[*].id
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "app-alb"
+  }
+}
+
+# Listener for HTTP
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.app_alb.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
+
+
+# Target Group for the Application
+resource "aws_lb_target_group" "app_tg" {
+  name     = "app-tg"
+  port     = var.application_port
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.my_vpc.id
+
+  health_check {
+    path                = "/healthz"
+    protocol            = "HTTP"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 5
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "app-tg"
+  }
+}
+
+# Launch Template for Auto Scaling Group
+resource "aws_launch_template" "app_launch_template" {
+  name_prefix   = "csye6225_asg_"
+  image_id      = var.custom_ami_id
+  instance_type = "t2.micro"
+  key_name      = var.key_pair_name
+
+  network_interfaces {
+    associate_public_ip_address = true  
+    subnet_id                   = aws_subnet.public_subnets[0].id
+    security_groups             = [aws_security_group.app_security_group.id]
+  }
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_instance_profile.name
+  }
+
+  user_data = base64encode(<<-EOF
     #!/bin/bash
     echo "Starting user data script..."
 
@@ -258,8 +340,6 @@ resource "aws_instance" "app_instance_ud" {
       sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
     fi
 
-     
-
     # Start CloudWatch Agent
     sudo systemctl restart amazon-cloudwatch-agent
 
@@ -268,8 +348,102 @@ resource "aws_instance" "app_instance_ud" {
 
     echo "User data script completed."
   EOF
+  )
 
   tags = {
-    Name = "user-app-instance-user_data"
+    Name = "csye6225-launch-template"
   }
+}
+# autoscaling.tf (continued)
+
+# Auto Scaling Group
+resource "aws_autoscaling_group" "app_asg" {
+  launch_template {
+    id      = aws_launch_template.app_launch_template.id
+    version = "$Latest"
+  }
+
+  vpc_zone_identifier = aws_subnet.public_subnets[*].id
+  min_size            = 3
+  max_size            = 5
+  desired_capacity    = 3
+  default_cooldown    = 60
+
+  target_group_arns = [aws_lb_target_group.app_tg.arn]
+
+  tag {
+    key                 = "Name"
+    value               = "autoscaling-app-instance"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+}
+# autoscaling.tf (continued)
+
+# Scale-Up Policy
+resource "aws_autoscaling_policy" "scale_up_policy" {
+  name                   = "scale-up-policy"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
+  autoscaling_group_name = aws_autoscaling_group.app_asg.name
+}
+
+# Scale-Down Policy
+resource "aws_autoscaling_policy" "scale_down_policy" {
+  name                   = "scale-down-policy"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
+  autoscaling_group_name = aws_autoscaling_group.app_asg.name
+}
+
+# CloudWatch Alarm for Scaling Up
+resource "aws_cloudwatch_metric_alarm" "cpu_high_alarm" {
+  alarm_name          = "cpu_high_alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "12"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.app_asg.name
+  }
+
+  alarm_description         = "Alarm when CPU exceeds 12%"
+  insufficient_data_actions = []
+
+  alarm_actions = [
+    aws_autoscaling_policy.scale_up_policy.arn
+  ]
+}
+
+# CloudWatch Alarm for Scaling Down
+resource "aws_cloudwatch_metric_alarm" "cpu_low_alarm" {
+  alarm_name          = "cpu_low_alarm"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "8"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.app_asg.name
+  }
+
+  alarm_description         = "Alarm when CPU falls below 8%"
+  insufficient_data_actions = []
+
+  alarm_actions = [
+    aws_autoscaling_policy.scale_down_policy.arn
+  ]
 }
