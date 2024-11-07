@@ -193,21 +193,21 @@ resource "aws_security_group" "lb_security_group" {
 
   # Ingress Rules
   ingress {
-    description      = "Allow HTTP traffic from anywhere"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
+    description = "Allow HTTP traffic from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
   }
   # Ingress Rule for HTTPS
   ingress {
-    description      = "Allow HTTPS traffic from anywhere"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
+    description = "Allow HTTPS traffic from anywhere"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
   }
 
 
@@ -283,7 +283,7 @@ resource "aws_launch_template" "app_launch_template" {
   key_name      = var.key_pair_name
 
   network_interfaces {
-    associate_public_ip_address = true  
+    associate_public_ip_address = true
     subnet_id                   = aws_subnet.public_subnets[0].id
     security_groups             = [aws_security_group.app_security_group.id]
   }
