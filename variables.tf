@@ -78,5 +78,27 @@ variable "domain_name" {
   type        = string
 }
 
+# variables.tf
 
+variable "lambda_function_name" {
+  description = "The name of the Lambda function for email verification."
+  type        = string
+  default     = "email-verification-lambda"
+}
+
+variable "sendgrid_api_key" {
+  description = "API key for SendGrid"
+  type        = string
+  sensitive   = true
+}
+
+variable "base_url" {
+  description = "Base URL for the application"
+  type        = string
+}
+
+variable "email_verification_zip_path" {
+  description = "Path to the email verification zip file"
+  type        = string
+}
   

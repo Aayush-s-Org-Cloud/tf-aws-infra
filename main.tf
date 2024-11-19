@@ -120,8 +120,8 @@ resource "aws_security_group" "db_security_group" {
     from_port       = var.db_port
     to_port         = var.db_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.app_security_group.id] # Application security group
-    description     = "Allow database traffic from app security group"
+    security_groups = [aws_security_group.app_security_group.id]
+    description     = "Allow database traffic from app and lambda security group"
   }
 
   # Egress rule to allow all outbound traffic from the RDS
@@ -214,10 +214,11 @@ resource "aws_security_group" "lb_security_group" {
 
   # Egress Rules - Allow all outbound traffic
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
   }
 
   tags = {
@@ -277,7 +278,7 @@ resource "aws_lb_target_group" "app_tg" {
 
 # Launch Template for Auto Scaling Group
 resource "aws_launch_template" "app_launch_template" {
-  name_prefix   = "csye6225_asg_"
+  name          = "csye6225_launch_template"
   image_id      = var.custom_ami_id
   instance_type = "t2.micro"
   key_name      = var.key_pair_name
@@ -329,7 +330,8 @@ resource "aws_launch_template" "app_launch_template" {
     echo "DATA_DIALECT=${var.db_dialect}" >> .env   
     echo "PORT=${var.application_port}" >> .env
     echo "S3_BUCKET_NAME=${aws_s3_bucket.private_bucket.bucket}" >> .env
-
+    echo "SNS_TOPIC_ARN=${aws_sns_topic.user_signup_topic.arn}" >> .env
+    
     # Display the .env content (optional for debugging)
     cat .env
 
@@ -358,6 +360,7 @@ resource "aws_launch_template" "app_launch_template" {
 
 # Auto Scaling Group
 resource "aws_autoscaling_group" "app_asg" {
+  name = "my-default-asg-name"
   launch_template {
     id      = aws_launch_template.app_launch_template.id
     version = "$Latest"
@@ -447,3 +450,65 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low_alarm" {
     aws_autoscaling_policy.scale_down_policy.arn
   ]
 }
+
+# lambda.tf
+
+# sns.tf
+
+# Create SNS Topic for User Signups
+resource "aws_sns_topic" "user_signup_topic" {
+  name = "user-signup-topic"
+
+  tags = {
+    Name = "User Signup Topic"
+  }
+}
+resource "aws_lambda_permission" "allow_sns_invoke" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.email_verification.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.user_signup_topic.arn
+}
+
+resource "aws_sns_topic_subscription" "lambda_subscription" {
+  topic_arn = aws_sns_topic.user_signup_topic.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.email_verification.arn
+
+  depends_on = [
+    aws_lambda_function.email_verification,
+    aws_lambda_permission.allow_sns_invoke
+  ]
+}
+
+resource "aws_lambda_function" "email_verification" {
+  filename         = var.email_verification_zip_path
+  function_name    = var.lambda_function_name
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "index.handler"
+  runtime          = "nodejs20.x"
+  source_code_hash = filebase64sha256(var.email_verification_zip_path)
+
+  environment {
+    variables = {
+      SENDGRID_API_KEY = var.sendgrid_api_key
+      BASE_URL         = var.base_url
+      FROM_EMAIL       = "noreply@em2049.demo.aayushpatel.ninja"
+      SNS_TOPIC_ARN    = aws_sns_topic.user_signup_topic.arn
+      S3_BUCKET_NAME   = aws_s3_bucket.private_bucket.bucket
+    }
+  }
+
+
+  timeout     = 30
+  memory_size = 128
+
+  tags = {
+    Name = var.lambda_function_name
+  }
+}
+
+
+
+# lambda.tf
