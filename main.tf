@@ -494,7 +494,7 @@ resource "aws_lambda_function" "email_verification" {
     variables = {
       SENDGRID_API_KEY = var.sendgrid_api_key
       BASE_URL         = var.base_url
-      FROM_EMAIL       = "noreply@em2049.demo.aayushpatel.ninja"
+      FROM_EMAIL       = var.from_email
       SNS_TOPIC_ARN    = aws_sns_topic.user_signup_topic.arn
       S3_BUCKET_NAME   = aws_s3_bucket.private_bucket.bucket
     }

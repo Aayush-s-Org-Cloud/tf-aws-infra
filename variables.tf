@@ -101,4 +101,8 @@ variable "email_verification_zip_path" {
   description = "Path to the email verification zip file"
   type        = string
 }
+variable "from_email" {
+  description = "The sender email address for the Lambda function"
+  type        = string
+}
   
