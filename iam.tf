@@ -191,8 +191,6 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
 
 
 
-
-
 # Attach S3 Full Access Policy to EC2 Role
 resource "aws_iam_role_policy_attachment" "s3_attach" {
   role       = aws_iam_role.ec2_role.name
@@ -210,3 +208,277 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_attach" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.cloudwatch_logging_policy.arn
 }
+
+
+# Policy for EC2 to access Database Password Secret
+resource "aws_iam_policy" "ec2_secret_access_policy" {
+  name        = "EC2_SecretsManager_Access_Policy"
+  description = "Policy to allow EC2 instances to access Database Password secret"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ],
+        Resource = aws_secretsmanager_secret.db_password_secret.arn
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Decrypt"
+        ],
+        Resource = aws_kms_key.secret_db_password_key.arn
+      }
+    ]
+  })
+}
+
+# Policy for Lambda to access Email Credentials Secret
+resource "aws_iam_policy" "lambda_secret_access_policy" {
+  name        = "Lambda_SecretsManager_Access_Policy"
+  description = "Policy to allow Lambda functions to access Email Credentials secret"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ],
+        Resource = aws_secretsmanager_secret.email_credentials_secret.arn
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Decrypt"
+        ],
+        Resource = aws_kms_key.secret_email_credentials_key.arn
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_role_policy_attachment" "ec2_secret_access_attach" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_secret_access_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_secret_access_attach" {
+  role       = aws_iam_role.lambda_exec_role.name
+  policy_arn = aws_iam_policy.lambda_secret_access_policy.arn
+}
+
+
+
+# Add KMS permissions to EC2 Role
+resource "aws_iam_policy" "ec2_kms_access_policy" {
+  name        = "EC2_KMS_Access_Policy"
+  description = "Policy to allow EC2 instances to use KMS keys for decryption"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ],
+        Resource = [
+          aws_kms_key.ec2_key.arn,
+          aws_kms_key.secret_db_password_key.arn
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_kms_access_attach" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_kms_access_policy.arn
+}
+
+# Add KMS permissions to Lambda Role
+resource "aws_iam_policy" "lambda_kms_access_policy" {
+  name        = "Lambda_KMS_Access_Policy"
+  description = "Policy to allow Lambda functions to use KMS keys for decryption"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey",
+          "kms:GenerateDataKey*"
+        ],
+        Resource = [
+          aws_kms_key.secret_email_credentials_key.arn
+        ]
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "lambda_kms_access_attach" {
+  role       = aws_iam_role.lambda_exec_role.name
+  policy_arn = aws_iam_policy.lambda_kms_access_policy.arn
+}
+
+# iam.tf
+
+# IAM User for Administration
+resource "aws_iam_user" "admin_user" {
+  name = "AdminUser"
+
+  tags = {
+    Name = "AdminUser"
+  }
+}
+
+# Optionally, attach administrative policies to this user
+resource "aws_iam_user_policy_attachment" "admin_user_attach" {
+  user       = aws_iam_user.admin_user.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+# iam.tf
+
+# IAM Role for Administration
+resource "aws_iam_role" "admin_role" {
+  name = "AdminRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::084828563934:user/AdminUser"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "AdminRole"
+  }
+}
+
+# Attach administrative policies to this role
+resource "aws_iam_role_policy_attachment" "admin_role_attach" {
+  role       = aws_iam_role.admin_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess" # Grants full access; adjust as needed
+}
+
+# iam.tf (continued)
+
+# IAM Role for Key Administration
+resource "aws_iam_role" "key_admin_role" {
+  name = "KeyAdminRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement : [{
+      Effect    = "Allow",
+      Principal = { AWS = aws_iam_user.admin_user.arn },
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = {
+    Name = "KeyAdminRole"
+  }
+}
+
+# IAM Policy for Key Administration
+resource "aws_iam_policy" "key_admin_policy" {
+  name        = "KeyAdminPolicy"
+  description = "Policy to allow administration of KMS keys"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Create*",
+          "kms:Describe*",
+          "kms:Enable*",
+          "kms:List*",
+          "kms:Put*",
+          "kms:Update*",
+          "kms:Revoke*",
+          "kms:GenerateDataKey*",
+          "kms:Disable*",
+          "kms:Get*",
+          "kms:Delete*"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach the Policy to KeyAdminRole
+resource "aws_iam_role_policy_attachment" "key_admin_policy_attach" {
+  role       = aws_iam_role.key_admin_role.name
+  policy_arn = aws_iam_policy.key_admin_policy.arn
+}
+
+
+# iam.tf
+
+# IAM Role for RDS
+resource "aws_iam_role" "rds_role" {
+  name = "RDSRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "rds.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "RDSRole"
+  }
+}
+
+
+resource "aws_iam_role" "s3_role" {
+  name = "S3Role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement : [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "s3.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "S3Role"
+  }
+}
+ 
