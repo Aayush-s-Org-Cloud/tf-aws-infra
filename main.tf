@@ -124,7 +124,7 @@ resource "aws_security_group" "db_security_group" {
     description     = "Allow database traffic from app and lambda security group"
   }
 
-  # Egress rule to allow all outbound traffic from the RDS
+  ## Egress rule to allow all outbound traffic from the RDS
   egress {
     from_port   = 0
     to_port     = 0
