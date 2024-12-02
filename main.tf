@@ -79,7 +79,7 @@ resource "aws_security_group" "app_security_group" {
   name   = "app-sg"
 
   # Ingress Rules
-/*
+  /*
   # Allow SSH access from trusted CIDR
   ingress {
     from_port   = 22
