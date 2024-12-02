@@ -105,4 +105,24 @@ variable "from_email" {
   description = "The sender email address for the Lambda function"
   type        = string
 }
-  
+variable "EMAIL_CREDENTIALS_SECRET_NAME" {
+  description = "The name of the Secrets Manager secret for email credentials"
+  type        = string
+  default     = "email-credentials-secret"
+}
+variable "ssl_certificate_arn_demo" {
+  description = "ARN of the imported SSL certificate for the demo environment"
+  type        = string
+}
+variable "kms_rotation_metadata_bucket_suffix" {
+  default = "kms key06"
+}
+variable "db_password_secret_name" {
+  description = "The name of the secret for the database password"
+  type        = string
+}
+
+variable "email_credentials_secret_name" {
+  description = "The name of the secret for email credentials"
+  type        = string
+}
